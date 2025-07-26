@@ -1,15 +1,27 @@
 {
   "name": "bassline",
   "version": "1.0.0",
-  "description": "Bassline Discord bot",
+  "description": "Bassline Discord bot with UptimeRobot support",
   "main": "main.js",
   "scripts": {
-    "start": "node main.js"
+    "start": "node main.js",
+    "dev": "nodemon main.js"
   },
-  "author": "YourName",
+  "keywords": [
+    "discord",
+    "bot",
+    "bassline",
+    "render",
+    "uptimerobot"
+  ],
+  "author": "Akuma",
   "license": "MIT",
   "dependencies": {
     "discord.js": "^14.11.0",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
