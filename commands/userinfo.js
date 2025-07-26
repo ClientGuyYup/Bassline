@@ -3,19 +3,27 @@ const { AttachmentBuilder } = require('discord.js');
 
 module.exports = {
   name: 'userinfo',
-  description: 'Shows user info as an image',
+  description: 'Shows user info as an image (no external fonts required)',
   async execute(message, args) {
     const user = message.mentions.users.first() || message.author;
     const member = await message.guild.members.fetch(user.id).catch(() => null);
-    if (!member) return message.reply("Couldn't fetch user data.");
+    if (!member) return message.reply("Couldn't find that user.");
 
-    // Safely extract presence and activity
-    const presence = member.presence;
-    const status = presence?.status || 'offline';
-    const activity = presence?.activities?.find(a => a.type === 0);
-    console.log(`Status: ${status}, Activity: ${activity?.name || 'None'}`);
+    const activities = member.presence?.activities || [];
+    const activity =
+      activities.find(a => a.type === 0) ||  // Playing
+      activities.find(a => a.type === 2) ||  // Listening
+      activities.find(a => a.type === 1);    // Streaming
 
-    // Setup canvas
+    const status = member.presence?.status || 'offline';
+
+    const statusColors = {
+      online: '#43b581',
+      idle: '#faa61a',
+      dnd: '#f04747',
+      offline: '#747f8d'
+    };
+
     const canvas = createCanvas(600, 200);
     const ctx = canvas.getContext('2d');
 
@@ -27,21 +35,32 @@ module.exports = {
     const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 128 }));
     ctx.drawImage(avatar, 30, 36, 128, 128);
 
-    // Debug box
-    ctx.strokeStyle = 'red';
-    ctx.strokeRect(180, 40, 380, 120);
-
-    // Font
-    ctx.font = '20px sans-serif';
+    // Use built-in sans-serif font (no registration)
+    ctx.font = 'bold 24px sans-serif';
     ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${user.username}#${user.discriminator}`, 180, 60);
 
-    // Draw texts
-    ctx.fillText(`Username: ${user.username}#${user.discriminator}`, 190, 60);
-    ctx.fillText(`ID: ${user.id}`, 190, 90);
-    ctx.fillText(`Status: ${status}`, 190, 120);
-    ctx.fillText(`Playing: ${activity?.name || 'None'}`, 190, 150);
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = '#cccccc';
+    ctx.fillText(`ID: ${user.id}`, 180, 90);
 
-    // Attach image
+    // Status circle
+    ctx.fillStyle = statusColors[status] || '#747f8d';
+    ctx.beginPath();
+    ctx.arc(148, 148, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Status text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`, 180, 120);
+
+    // Activity text fallback
+    ctx.fillStyle = '#00b0f4';
+    const activityText = activity
+      ? `${activity.type === 2 ? 'Listening to' : activity.type === 1 ? 'Streaming' : 'Playing'}: ${activity.name}`
+      : 'Playing: None';
+    ctx.fillText(activityText, 180, 150);
+
     const buffer = canvas.toBuffer('image/png');
     const attachment = new AttachmentBuilder(buffer, { name: 'userinfo.png' });
 
