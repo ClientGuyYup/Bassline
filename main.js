@@ -33,7 +33,7 @@ client.once('ready', () => {
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return; // Ignore bots
-  if (!message.content.startsWith('!')) return; // Prefix "!"
+  if (!message.content.startsWith('$')) return; // Prefix "!"
 
   const args = message.content.slice(1).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
