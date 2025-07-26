@@ -21,7 +21,9 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildPresences,  // 👈 needed for status/activity
+    GatewayIntentBits.GuildMembers     // 👈 needed to fetch user info
   ]
 });
 
