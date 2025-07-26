@@ -1,105 +1,62 @@
+const { PermissionsBitField, EmbedBuilder } = require('discord.js');
+
 module.exports = {
   name: 'ban',
-  description: 'Soft ban a user by assigning a Banned role and restricting access (Admin/Owner only)',
+  description: 'Ban a user by giving them the Banned role and locking them out.',
   async execute(message, args) {
-    // Restrict to server owner or administrators only
-    if (
-      !message.member.permissions.has('Administrator') &&
-      message.author.id !== message.guild.ownerId
-    ) {
-      return message.reply("Only administrators or the server owner can use this command.");
+    const author = message.member;
+    const target = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
+
+    if (!author.permissions.has(PermissionsBitField.Flags.Administrator) &&
+        message.guild.ownerId !== message.author.id) {
+      return message.reply("❌ You don't have permission to use this command.");
     }
 
-    if (!args[0]) {
-      return message.reply("Please provide a user ID or mention to ban.");
-    }
+    if (!target) return message.reply('Please mention a valid user to ban.');
 
-    // Fetch user by mention or ID
-    let user;
-    if (message.mentions.users.size > 0) {
-      user = message.mentions.users.first();
-    } else {
-      try {
-        user = await message.client.users.fetch(args[0]);
-      } catch {
-        return message.reply("Invalid user ID.");
-      }
-    }
+    if (target.id === message.author.id) return message.reply("You can't ban yourself.");
+    if (target.id === message.client.user.id) return message.reply("You can't ban the bot.");
 
-    if (!user) return message.reply("User not found.");
+    // Check or create the Banned role
+    let bannedRole = message.guild.roles.cache.find(role => role.name === 'Banned');
 
-    // Fetch guild member
-    let member;
-    try {
-      member = await message.guild.members.fetch(user.id);
-    } catch {
-      return message.reply("User is not in this server.");
-    }
-
-    if (!member.manageable) {
-      return message.reply("I cannot assign roles to this user due to role hierarchy.");
-    }
-
-    // Role color and name check
-    const bannedRoleColor = 0xff0000;
-    let bannedRole = message.guild.roles.cache.find(r => r.color === bannedRoleColor && r.name.toLowerCase().includes('banned'));
-
-    // Create role if missing
     if (!bannedRole) {
+      bannedRole = await message.guild.roles.create({
+        name: 'Banned',
+        color: 0x2f3136, // dark gray
+        reason: 'Created for banning users'
+      });
+    }
+
+    // Move Banned role to top
+    const botMember = await message.guild.members.fetchMe();
+    const highestRole = botMember.roles.highest;
+
+    try {
+      await bannedRole.setPosition(highestRole.position - 1);
+    } catch (err) {
+      console.error('Failed to move role:', err);
+    }
+
+    // Deny access in all channels
+    message.guild.channels.cache.forEach(async (channel) => {
       try {
-        bannedRole = await message.guild.roles.create({
-          name: 'Banned',
-          color: bannedRoleColor,
-          reason: 'Role for soft-banned users',
-          permissions: []
+        await channel.permissionOverwrites.edit(bannedRole, {
+          ViewChannel: false
         });
-
-        // Update all channel permission overwrites for the role
-        for (const [, channel] of message.guild.channels.cache) {
-          await channel.permissionOverwrites.edit(bannedRole, {
-            ViewChannel: false,
-            SendMessages: false,
-            Speak: false,
-            Connect: false,
-            AddReactions: false,
-            ReadMessageHistory: false,
-          }).catch(() => null);
-        }
       } catch (err) {
-        console.error('Failed to create Banned role or update permissions:', err);
-        return message.reply('Failed to create the Banned role. Please check my permissions.');
+        console.error(`Failed to update channel ${channel.name}:`, err);
       }
-    }
+    });
 
-    // Check if already banned
-    if (member.roles.cache.has(bannedRole.id)) {
-      return message.reply(`${user.tag} is already banned.`);
-    }
-
-    // Remove all roles except @everyone
+    // Add the role
     try {
-      const rolesToRemove = member.roles.cache.filter(r => r.id !== message.guild.id);
-      await member.roles.remove(rolesToRemove);
+      await target.roles.add(bannedRole, 'User was banned');
+      await target.send(`You have been banned from **${message.guild.name}**.`);
+      return message.reply(`✅ ${target.user.tag} has been banned.`);
     } catch (err) {
-      console.error('Failed to remove roles:', err);
-      return message.reply('Failed to remove user roles.');
+      console.error(err);
+      return message.reply('❌ Failed to ban the user.');
     }
-
-    // Assign banned role
-    try {
-      await member.roles.add(bannedRole);
-    } catch (err) {
-      console.error('Failed to assign Banned role:', err);
-      return message.reply('Failed to assign the Banned role.');
-    }
-
-    // DM user about ban
-    try {
-      await user.send(`You have been banned from **${message.guild.name}**.`);
-    } catch {
-      // Ignore if can't DM
-    }
-
-    return message.reply(`Soft-banned ${user.tag} by assigning the Banned role.`);
   }
 };
